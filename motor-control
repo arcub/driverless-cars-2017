@@ -1,0 +1,101 @@
+//Land rover code for the arduino
+//sets up the motors for movement and allows for pre-programmed paths to be made
+//Created by Brandon
+//Date: 06/12/2017
+
+
+//initialize the steering
+const int steering1 = 3;
+const int steering2 = 5;
+
+//initialize the front motor
+const int frontMotor1 = 6;
+const int frontMotor2 = 9;
+
+//intitialize the back motor
+const int backMotor1 = 10;
+const int backMotor2 = 11;
+
+//create 4 different speeds
+const int speed1 = 40; //below 40 the robot either doesnt move or moves at an incredibly small speed
+const int speed2 = 70;
+const int speed3 = 150;
+const int speed4 = 255;
+
+//define 2 directions for the turns
+#define FORWARD LOW
+#define BACKWARD HIGH
+
+
+void setup() {
+
+  //define pinModes for the motors
+  pinMode(steering1, OUTPUT);
+  pinMode(steering2, OUTPUT);
+  
+  pinMode(frontMotor1, OUTPUT);
+  pinMode(frontMotor2, OUTPUT);
+
+  pinMode(backMotor1, OUTPUT);
+  pinMode(backMotor2, OUTPUT);
+}
+
+// left empty for now for the addition of any code
+void loop() {
+
+}
+
+//creates a function to move the robot forward
+//takes a variable speed to control how fast the movement goes
+void forward(int speed){
+  
+  analogWrite(steering1, 0);
+  digitalWrite(steering2, LOW);
+
+  analogWrite(frontMotor1, speed);
+  digitalWrite(frontMotor2, LOW);
+
+  analogWrite(backMotor1, speed);
+  digitalWrite(backMotor2, LOW);
+}
+
+//creates a function to move right
+//takes 3 variables the speed, the angle you want the wheels at up to 20,
+//and the direction you want the robot to go
+void right(int speed, int angle, int direction){
+  
+  int changeAngle = angle * 12.75; //this allows for a specific angle to be input for the wheel to move to that position
+                                   //may not be correct I guessed the wheel could turn 20 degrees in either direction
+  
+  analogWrite(steering1, changeAngle);
+  digitalWrite(steering2, HIGH);
+
+  analogWrite(frontMotor1, speed);
+  digitalWrite(frontMotor2, direction);
+}
+
+//creates a funciton to move left
+//takes 3 variables the speed, the angle you want the wheels at up to 20,
+//and the direction you want the robot to go
+void left(int speed, int angle, int direction){
+
+  int changeAngle = angle * 12.75; //this allows for a specific angle to be input for the wheel to move to that position
+                                   //may not be correct I guessed the wheel could turn 20 degrees in either direction
+
+  analogWrite(steering1, changeAngle);
+  digitalWrite(steering2, LOW);
+
+  analogWrite(frontMotor1, speed);
+  digitalWrite(frontMotor2, direction); 
+}
+
+//creates a function to move backwards
+//takes a variable speed, and the default is to move straight
+void reverse(int speed){
+
+  analogWrite(steering1, 0);
+  digitalWrite(steering2, HIGH);
+
+  analogWrite(frontMotor1, speed);
+  digitalWrite(frontMotor2, HIGH);
+}
