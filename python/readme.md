@@ -7,4 +7,4 @@ and streaming the camera(still to be implemented).
 
 The Self-driving-controlled folder is for using with a remote control when controlling directly, and will eventually
 stream the footage from the camera so that the user doesnt have to use a VNC. Will be capable of driving itself, but
-currently this is nto implemented.
+currently this is not implemented.
