@@ -8,15 +8,35 @@ from PIL import Image
 from PIL import ImageTk
 import cv2
 import serial
+import os
+import logging
 
-#comment out the first if using GPIO, the second if using usb
-port = '/dev/ttyACM0'
-#port = '/dev/ttyAMA0'
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.INFO)
 
-ser = serial.Serial(port, 115200)
-ser.close()
-ser.open()
+handler = logging.FileHandler('Red_Rover.log')
+handler.setLevel(logging.INFO)
 
+formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+handler.setFormatter(formatter)
+
+logger.addHandler(handler)
+
+logger.info('Attempting to connect to a port.')
+try:
+    port = '/dev/ttyACM0'
+
+    ser = serial.Serial(port, 115200)
+    ser.close()
+    ser.open()
+    logger.info('Connected to port %s', port)
+
+except FileNotFoundError:
+    port = '/dev/ttyAMA0'
+
+    ser.close()
+    ser.open()
+    logger.info('Connected to port %s', port)
 
 LARGE_FONT = ("Times", 90, "bold")
 MEDIUM_FONT = ("Times", 60)
@@ -64,17 +84,26 @@ class Main(tk.Tk):
         container.grid_columnconfigure(0, weight = 1)
 
         self.state = True
+        self.mustache = False
         self.vs = vs
         self.frame = None
         self.thread = None
         self.stopEvent = threading.Event()
         
         self.bind("<F11>", self.toggle_fullscreen)
+        self.bind("<F10>", self.toggle_mustaches)
         self.bind("<Escape>", self.kill)
         self.bind("w", self.forward)
-        self.bind("a", self.left)
+        self.bind("a", self.backleft)
         self.bind("s", self.reverse)
-        self.bind("d", self.right)
+        self.bind("d", self.backright)
+        self.bind("q", self.left)
+        self.bind("e", self.right)
+        self.bind("<KeyRelease>", self.stop)
+        self.bind("<Left>", self.servo_left)
+        self.bind("<Right>", self.servo_right)
+        self.bind("<Down>", self.servo_return_position)
+        self.bind("<space>", self.sound_buzzer)
         
         self.frames = {}
 
@@ -88,31 +117,93 @@ class Main(tk.Tk):
         self.show_frame(MainPage)
 
     def show_frame(self, cont):
-
         frame = self.frames[cont]
         frame.tkraise()
+        logger.info('Raising frame %s', frame)
+
+    def sound_buzzer(self, event = None):
+        try:
+            ser.write('b'.encode('utf-8'))
+            logger.info('Sent b to arduino')
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except Exception:
+            logger.error('Failed to send letter b', exc_info = True)
         
     def forward(self, event = None):
-        ser.write('w'.encode('utf-8'))
+        try:
+            ser.write('w'.encode('utf-8'))
+            logger.info('Sent w to arduino')
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except Exception:
+            logger.error('Failed to send letter w', exc_info = True)
+
+    def backleft(self, event = None):
+        try:
+            ser.write('a'.encode('utf-8'))
+            logger.info('Sent a to arduino')
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except Exception:
+            logger.error('Failed to send letter a', exc_info = True)
 
     def left(self, event = None):
-        ser.write('a'.encode('utf-8'))
+        try:
+            ser.write('q'.encode('utf-8'))
+            logger.info('Sent q to arduino')
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except Exception:
+            logger.error('Failed to send letter q', exc_info = True)
+
+    def stop(self, event = None):
+        try:
+            ser.write('s'.encode('utf-8'))
+            logger.info('Sent s to arduino')
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except Exception:
+            logger.error('Failed to send letter s', exc_info = True)
 
     def reverse(self, event = None):
-        ser.write('s'.encode('utf-8'))
+        try:
+            ser.write('x'.encode('utf-8'))
+            logger.info('Sent x to arduino')
+        except (SystemExit, KeyboardInterrupt):
+            raise
+        except Exception:
+            logger.error('Failed to send letter x', exc_info = True)
+
+    def backright(self, event = None):
+        ser.write('d'.encode('utf-8'))
 
     def right(self, event = None):
-        ser.write('d'.encode('utf-8'))
+        ser.write('e'.encode('utf-8'))
+
+    def servo_left(self, event = None):
+        ser.write(','.encode('utf-8'))
+
+    def servo_right(self, event = None):
+        ser.write('.'.encode('utf-8'))
+
+    def servo_return_position(self, event = None):
+        ser.write('/'.encode('utf-8'))
         
     def toggle_fullscreen(self, event = None):
         self.state = not self.state
         self.attributes("-fullscreen", self.state)
 
+    def toggle_mustaches(self, event = None):
+        self.mustache = not self.mustache
+        print("[INFO] Mustaches %s" % self.mustache)
+        
+
     def kill(self, event = None):
         print("[INFO] closing...")
         self.stopEvent.set()
         self.vs.stop()
-        ser.close()
+        #ser.close()
         self.destroy()
         
 
@@ -121,7 +212,7 @@ class MainPage(tk.Frame):
     def __init__(self, parent, controller):
         tk.Frame.__init__(self, parent)
 
-        ser.write('l'.encode('utf-8'))
+        #ser.write('l'.encode('utf-8'))
 
         self.configure(bg = BACKGROUND_COLOUR)
 
@@ -162,7 +253,7 @@ class ControlledMode(tk.Frame):
 
     def __init__(self, parent, controller):
 
-        ser.write('c'.encode('utf-8'))
+        #ser.write('c'.encode('utf-8'))
 
         tk.Frame.__init__(self, parent)
 
@@ -177,6 +268,7 @@ class ControlledMode(tk.Frame):
         self.vs = vs
         self.frame = None
         self.stopEvent = None
+        self.mustache = False
 
         self.panel = None
     
@@ -214,91 +306,95 @@ class ControlledMode(tk.Frame):
                 self.frame = self.vs.read()
                 self.frame = imutils.resize(self.frame, width = int(swidth / 1.5), height = int(sheight / 1.5))
 
-                # change image from bgr (opencv) to rgb (PIL) then to PIL and ImageTk format
                 img1 = cv2.cvtColor(self.frame, cv2.COLOR_BGR2RGB)
-                grey = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
+                    
+                if self.mustache != False:
+                    # change image from bgr (opencv) to rgb (PIL) then to PIL and ImageTk format
+                    grey = cv2.cvtColor(img1, cv2.COLOR_BGR2GRAY)
 
-                faces = faceCascade.detectMultiScale(
-                    grey,
-                    scaleFactor = 1.1,
-                    minNeighbors = 5,
-                    minSize = (30, 30),
-                    flags = cv2.CASCADE_SCALE_IMAGE)
-                
-                for (x, y, w, h) in faces:
-                    #uncomment the next line for debugging faces
-                    #face = cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 2)
-                    print("[INFO] detected %s" % len(faces) + (" face" if len(faces) == 1 else " faces"))
-                    self.mustache_count += len(faces)
+                    faces = faceCascade.detectMultiScale(
+                        grey,
+                        scaleFactor = 1.1,
+                        minNeighbors = 5,
+                        minSize = (30, 30),
+                        flags = cv2.CASCADE_SCALE_IMAGE)
+                    
+                    for (x, y, w, h) in faces:
+                        #uncomment the next line for debugging faces
+                        #face = cv2.rectangle(img, (x, y), (x+w, y+h), (255, 0, 0), 2)
+                        print("[INFO] detected %s" % len(faces) + (" face" if len(faces) == 1 else " faces"))
+                        self.mustache_count += len(faces)
 
-                    roi_grey = grey[y:y+h, x:x+w]
-                    roi_color = img1[y:y+h, x:x+w]
+                        roi_grey = grey[y:y+h, x:x+w]
+                        roi_color = img1[y:y+h, x:x+w]
 
-                    nose = noseCascade.detectMultiScale(roi_grey)
+                        nose = noseCascade.detectMultiScale(roi_grey)
 
-                    for (nx, ny, nw, nh) in nose:
-                        #uncomment the next line for debugging noses
-                        #cv2.rectangle(roi_color, (nx, ny), (nx+nw, ny+nh), (255, 0, 0), 1)
-                        print("[INFO] detected a nose")
+                        for (nx, ny, nw, nh) in nose:
+                            #uncomment the next line for debugging noses
+                            #cv2.rectangle(roi_color, (nx, ny), (nx+nw, ny+nh), (255, 0, 0), 1)
+                            print("[INFO] detected a nose")
 
-                        #mustache should be 3 times the width of the nose
-                        mustacheWidth = 3 * nw
-                        mustacheHeight = mustacheWidth * origMustacheHeight / origMustacheWidth
+                            #mustache should be 3 times the width of the nose
+                            mustacheWidth = 3 * nw
+                            mustacheHeight = mustacheWidth * origMustacheHeight / origMustacheWidth
 
-                        #center the mustache
-                        x1 = nx - (mustacheWidth/4)
-                        x2 = nx + nw + (mustacheWidth/4)
-                        y1 = ny + nh - (mustacheHeight/2)
-                        y2 = ny + nh + (mustacheHeight/2)
+                            #center the mustache
+                            x1 = nx - (mustacheWidth/4)
+                            x2 = nx + nw + (mustacheWidth/4)
+                            y1 = ny + nh - (mustacheHeight/2)
+                            y2 = ny + nh + (mustacheHeight/2)
 
-                        x1 = int(x1)
-                        x2 = int(x2)
-                        y1 = int(y1)
-                        y2 = int(y2)
+                            x1 = int(x1)
+                            x2 = int(x2)
+                            y1 = int(y1)
+                            y2 = int(y2)
 
-                        #check for clipping
-                        if x1 < 0:
-                            x1 = 0
-                        if y1 < 0:
-                            y1 = 0
-                        if x2 > w:
-                            x2 = w
-                        if y2 > h:
-                            y2 = h
+                            #check for clipping
+                            if x1 < 0:
+                                x1 = 0
+                            if y1 < 0:
+                                y1 = 0
+                            if x2 > w:
+                                x2 = w
+                            if y2 > h:
+                                y2 = h
 
-                        #recalculate the width and height
-                        mustacheWidth = x2 - x1
-                        mustacheHeight = y2 - y1
+                            #recalculate the width and height
+                            mustacheWidth = x2 - x1
+                            mustacheHeight = y2 - y1
 
-                        mustacheWidth = int(mustacheWidth)
-                        mustacheHeight = int(mustacheHeight)
+                            mustacheWidth = int(mustacheWidth)
+                            mustacheHeight = int(mustacheHeight)
 
-                        # resize the original image and the masks to the mustache sizes
-                        mustache = cv2.resize(imgMustache, (mustacheWidth, mustacheHeight), interpolation = cv2.INTER_AREA)
-                        mask = cv2.resize(orig_mask, (mustacheWidth, mustacheHeight), interpolation = cv2.INTER_AREA)
-                        mask_inv = cv2.resize(orig_mask_inv, (mustacheWidth, mustacheHeight), interpolation = cv2.INTER_AREA)
+                            # resize the original image and the masks to the mustache sizes
+                            mustache = cv2.resize(imgMustache, (mustacheWidth, mustacheHeight), interpolation = cv2.INTER_AREA)
+                            mask = cv2.resize(orig_mask, (mustacheWidth, mustacheHeight), interpolation = cv2.INTER_AREA)
+                            mask_inv = cv2.resize(orig_mask_inv, (mustacheWidth, mustacheHeight), interpolation = cv2.INTER_AREA)
 
-                        #take ROI for mustache from background equal to size of mustache image
-                        roi = roi_color[y1:y2, x1:x2]
+                            #take ROI for mustache from background equal to size of mustache image
+                            roi = roi_color[y1:y2, x1:x2]
 
-                        #roi_bg contains the original image only where the mustache is not
-                        roi_bg = cv2.bitwise_and(roi, roi, mask = mask_inv)
+                            #roi_bg contains the original image only where the mustache is not
+                            roi_bg = cv2.bitwise_and(roi, roi, mask = mask_inv)
 
-                        #roi_fg contains the original image only where the image is
-                        roi_fg = cv2.bitwise_and(mustache, mustache, mask = mask)
+                            #roi_fg contains the original image only where the image is
+                            roi_fg = cv2.bitwise_and(mustache, mustache, mask = mask)
 
-                        # join the roi_bg and roi_fg
-                        dst = cv2.add(roi_bg, roi_fg)
+                            # join the roi_bg and roi_fg
+                            dst = cv2.add(roi_bg, roi_fg)
 
-                        # place the joined image, saved to dst, back over the original image
-                        roi_color[y1:y2, x1:x2] = dst
+                            # place the joined image, saved to dst, back over the original image
+                            roi_color[y1:y2, x1:x2] = dst
 
-                        break
+                            break
 
                 img = Image.fromarray(img1)
                 img = ImageTk.PhotoImage(img)
-                print("[INFO] HAHA you have a mustache now")
-                print("[INFO] I have drawn %s mustaches on people" % self.mustache_count)
+                
+                if self.mustache != False:    
+                    print("[INFO] HAHA you have a mustache now")
+                    print("[INFO] I have drawn %s mustaches on people" % self.mustache_count)
                 
                 if self.panel is None:
                     self.panel = tk.Label(self, image = img)
@@ -317,7 +413,7 @@ class MappingMode(tk.Frame):
 
     def __init__(self, parent, controller):
 
-        ser.write('m'.encode('utf-8'))
+        #ser.write('m'.encode('utf-8'))
 
         tk.Frame.__init__(self, parent)
 
