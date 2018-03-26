@@ -12,3 +12,6 @@
 
 # Project Supervisor
 To be confirmed
+
+# Notice
+These files are provide as-is, with no guarantee on if they will work or not, or even as intended.
